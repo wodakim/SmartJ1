@@ -114,6 +114,7 @@ namespace EntropySyndicate.Gameplay
 
             _services.Get<ProgressionService>()?.ApplyRunRewards(scrapReward, xpReward);
             _retentionService?.RegisterRunEnd();
+            _analytics?.SetEntropyPeak(_entropy.PeakEntropy);
             _analytics?.EndRun(_runTime);
             _analytics?.LogEvent("run_end", _score.ToString());
             _analytics?.LogEvent("entropy_peak", _entropy.PeakEntropy.ToString("F1"));

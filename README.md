@@ -181,3 +181,75 @@ This iteration hardens runtime reliability and performance:
 3. In project assets, assign `BuildRuntimeConfig` to `GameBootstrapper`.
 4. For QA test sessions: set `testModeEnabled=true`, `debugMode=true`, `productionMode=false`.
 5. Build APK and install on device; analytics JSON/CSV writes to `Application.persistentDataPath`.
+
+
+## TEST EXECUTION PACK (Android)
+
+### 1) Android build checklist (Unity)
+1. **Build Settings**
+   - Switch platform to **Android**.
+   - Ensure `Assets/Scenes/Main.unity` is included and first in Scenes In Build.
+2. **Player Settings → Other Settings**
+   - Scripting Backend: **IL2CPP**.
+   - API Compatibility Level: **.NET Standard 2.1**.
+   - Target Architectures: **ARM64** (recommended for device parity).
+   - Minimum API Level: **Android 8.0 / API 26**.
+3. **Player Settings → Resolution and Presentation**
+   - Default orientation and safe area as intended for portrait UX.
+4. **Runtime config in scene**
+   - Assign `BuildRuntimeConfig` to `GameBootstrapper`.
+   - For QA build: `productionMode=false`, `debugMode=true`.
+   - Optional QA acceleration: `testModeEnabled=true` (2–3 min cap using `forcedSessionLengthSeconds`).
+5. **Performance target**
+   - `Application.targetFrameRate=60`, `QualitySettings.vSyncCount=0` already set in bootstrap.
+
+### 2) In-game QA checklist (10-minute device protocol)
+- **First 60 seconds**
+  - First interaction ≤ 3s (tap + shard feedback).
+  - First meaningful feedback ≤ 5s.
+  - First reward ≤ 15s.
+  - First unlock event by ~60s (`first_unlock_within_60s`).
+- **Test Mode**
+  - Enable in debug panel (`ToggleTestMode`).
+  - Verify run auto-ends near `forcedSessionLengthSeconds` (2–3 min).
+  - Verify accelerated progression/reward visibility is apparent.
+- **DDA runs 1–3**
+  - Execute 3 consecutive runs on fresh profile.
+  - Confirm early runs feel easier than run 4+.
+- **Monetization timing gates**
+  - First session suppression active (no early ad pressure).
+  - No rewarded offers during frustration window.
+  - Offers appear after positive spike moments only.
+
+### 3) Retrieving `analytics_events.csv` from Android
+Use app package name shown in Player Settings (example `com.company.entropysyndicate`).
+
+**External files path (most convenient):**
+- `/sdcard/Android/data/<package_name>/files/analytics_events.csv`
+
+ADB pull example:
+```bash
+adb shell ls /sdcard/Android/data/<package_name>/files/
+adb pull /sdcard/Android/data/<package_name>/files/analytics_events.csv ./analytics_events.csv
+```
+
+If device writes to internal app storage, use:
+```bash
+adb shell run-as <package_name> ls files
+adb shell run-as <package_name> cat files/analytics_events.csv > analytics_events.csv
+```
+
+### 4) QA Session Summary (Game Over, debug builds only)
+- At Game Over, `UIFlowController` shows a debug-only QA panel with:
+  - time-to-first-cast
+  - time-to-first-reward
+  - time-to-first-damage
+  - run duration bucket
+  - entropy peak
+  - energy depletion count
+  - top 3 shard usages
+
+### 5) BuildRuntimeConfig gating expectations
+- QA summary panel visible only when `debugMode=true`.
+- Overlay remains optional via in-game toggle.
+- Production build (`productionMode=true`, `debugMode=false`) remains clean (no debug clutter/log noise).

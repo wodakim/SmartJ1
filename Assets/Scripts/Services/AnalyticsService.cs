@@ -24,6 +24,20 @@ namespace EntropySyndicate.Services
             public List<AnalyticsEvent> events;
         }
 
+        public struct QaRunSummary
+        {
+            public float firstCast;
+            public float firstReward;
+            public float firstDamage;
+            public float runDuration;
+            public string durationBucket;
+            public float entropyPeak;
+            public int energyDepletions;
+            public string topShard1;
+            public string topShard2;
+            public string topShard3;
+        }
+
         private readonly List<AnalyticsEvent> _events = new List<AnalyticsEvent>(1024);
         private readonly Dictionary<string, int> _shardUsage = new Dictionary<string, int>(32);
 
@@ -32,6 +46,8 @@ namespace EntropySyndicate.Services
         private float _firstDamageTaken = -1f;
         private float _firstEntropySpike = -1f;
         private float _firstReward = -1f;
+        private float _entropyPeak;
+        private float _lastRunDuration;
         private int _energyDepletionCount;
         private readonly List<float> _runDurations = new List<float>(64);
         private bool _debugOverlayEnabled;
@@ -53,7 +69,15 @@ namespace EntropySyndicate.Services
             _firstDamageTaken = -1f;
             _firstEntropySpike = -1f;
             _firstReward = -1f;
+            _entropyPeak = 0f;
+            _lastRunDuration = 0f;
             _energyDepletionCount = 0;
+            _shardUsage.Clear();
+        }
+
+        public void SetEntropyPeak(float value)
+        {
+            _entropyPeak = value;
         }
 
         public void LogEvent(string eventName, string payload = "")
@@ -116,6 +140,7 @@ namespace EntropySyndicate.Services
 
         public void EndRun(float runDuration)
         {
+            _lastRunDuration = runDuration;
             _runDurations.Add(runDuration);
             LogEvent("run_duration_distribution", runDuration.ToString("F2"));
             LogEvent("energy_depletion_frequency", _energyDepletionCount.ToString());
@@ -136,6 +161,62 @@ namespace EntropySyndicate.Services
         public bool IsDebugOverlayEnabled()
         {
             return _debugOverlayEnabled;
+        }
+
+        public QaRunSummary GetQaRunSummary()
+        {
+            QaRunSummary summary = new QaRunSummary
+            {
+                firstCast = _firstShardCast,
+                firstReward = _firstReward,
+                firstDamage = _firstDamageTaken,
+                runDuration = _lastRunDuration,
+                durationBucket = GetDurationBucket(_lastRunDuration),
+                entropyPeak = _entropyPeak,
+                energyDepletions = _energyDepletionCount,
+                topShard1 = "-",
+                topShard2 = "-",
+                topShard3 = "-"
+            };
+
+            string best1 = "-";
+            string best2 = "-";
+            string best3 = "-";
+            int c1 = -1;
+            int c2 = -1;
+            int c3 = -1;
+
+            foreach (KeyValuePair<string, int> kv in _shardUsage)
+            {
+                if (kv.Value > c1)
+                {
+                    c3 = c2; best3 = best2;
+                    c2 = c1; best2 = best1;
+                    c1 = kv.Value; best1 = kv.Key + "(" + kv.Value + ")";
+                }
+                else if (kv.Value > c2)
+                {
+                    c3 = c2; best3 = best2;
+                    c2 = kv.Value; best2 = kv.Key + "(" + kv.Value + ")";
+                }
+                else if (kv.Value > c3)
+                {
+                    c3 = kv.Value; best3 = kv.Key + "(" + kv.Value + ")";
+                }
+            }
+
+            summary.topShard1 = best1;
+            summary.topShard2 = best2;
+            summary.topShard3 = best3;
+            return summary;
+        }
+
+        private static string GetDurationBucket(float seconds)
+        {
+            if (seconds < 60f) return "<60s";
+            if (seconds < 180f) return "60-180s";
+            if (seconds < 300f) return "180-300s";
+            return ">=300s";
         }
 
         public void PrintSessionSummary()

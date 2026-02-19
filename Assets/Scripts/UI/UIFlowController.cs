@@ -29,6 +29,8 @@ namespace EntropySyndicate.UI
 
         [Header("Game Over")]
         [SerializeField] private TextMeshProUGUI gameOverSummaryLabel;
+        [SerializeField] private GameObject qaSessionSummaryPanel;
+        [SerializeField] private TextMeshProUGUI qaSessionSummaryLabel;
 
         private ServiceRegistry _services;
         private GameStateMachine _stateMachine;
@@ -70,6 +72,7 @@ namespace EntropySyndicate.UI
             if (state == GameFlowState.GameOver)
             {
                 UpdateGameOverSummary();
+                UpdateQaSessionSummary();
             }
         }
 
@@ -126,6 +129,43 @@ namespace EntropySyndicate.UI
             }
 
             gameOverSummaryLabel.SetText("Run {0:0}s\nScore {1}\nEntropy {2:0}%", _run.RunSeconds, _run.Score, _run.EntropyNormalized * 100f);
+        }
+
+        private void UpdateQaSessionSummary()
+        {
+            bool showQa = _runtimeConfig != null && _runtimeConfig.debugMode;
+            SetScreenActive(qaSessionSummaryPanel, showQa);
+            if (!showQa || qaSessionSummaryLabel == null)
+            {
+                return;
+            }
+
+            AnalyticsService analytics = _services.Get<AnalyticsService>();
+            if (analytics == null)
+            {
+                qaSessionSummaryLabel.SetText("QA Summary unavailable");
+                return;
+            }
+
+            AnalyticsService.QaRunSummary summary = analytics.GetQaRunSummary();
+            qaSessionSummaryLabel.SetText(
+                "QA Session Summary\n" +
+                "First Cast: {0:0.00}s\n" +
+                "First Reward: {1:0.00}s\n" +
+                "First Damage: {2:0.00}s\n" +
+                "Run Bucket: {3}\n" +
+                "Entropy Peak: {4:0.0}\n" +
+                "Energy Depletions: {5}\n" +
+                "Top Shards: {6}, {7}, {8}",
+                summary.firstCast,
+                summary.firstReward,
+                summary.firstDamage,
+                summary.durationBucket,
+                summary.entropyPeak,
+                summary.energyDepletions,
+                summary.topShard1,
+                summary.topShard2,
+                summary.topShard3);
         }
 
         public void OnTapStartRun() => _run.StartRun();
